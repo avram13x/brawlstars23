@@ -142,6 +142,15 @@ a { color: var(--accent); }
 .panel__title { margin: 0; padding: 12px 14px 4px; font-size: .9rem; color: var(--muted); font-weight: 600; letter-spacing: .3px; text-transform: uppercase; }
 .panel__search { padding: 12px; display: flex; flex-direction: column; gap: 10px; border-bottom: 1px solid var(--line); }
 
+.tabs { display: flex; gap: 6px; padding: 12px 12px 0; }
+.tab {
+  flex: 1; border: 1px solid var(--line); background: transparent; color: var(--muted);
+  border-radius: 10px; padding: 7px 10px; font: inherit; font-size: .82rem; cursor: pointer;
+  transition: background .12s, color .12s, border-color .12s;
+}
+.tab:hover { background: var(--card-2); }
+.tab.is-active { background: var(--card-2); color: var(--text); border-color: var(--accent); }
+
 .region-list { list-style: none; margin: 0; padding: 6px; overflow-y: auto; flex: 1; }
 .region-item {
   display: flex; align-items: center; gap: 10px;
@@ -284,14 +293,21 @@ a { color: var(--accent); }
       <div class="summary__item summary__item--total">
         <span class="summary__num" id="statTotal">0</span><span class="summary__label">регионов</span>
       </div>
+      <div class="summary__item summary__item--total">
+        <span class="summary__num" id="statCities">0</span><span class="summary__label">городов</span>
+      </div>
       <div class="summary__clock" id="clock">--:--</div>
     </div>
   </header>
 
   <main id="main" class="layout">
-    <aside class="panel panel--regions" aria-label="Регионы">
+    <aside class="panel panel--regions" aria-label="Регионы и города">
+      <div class="tabs" role="tablist" aria-label="Тип объектов">
+        <button class="tab is-active" data-tab="regions" role="tab" aria-selected="true" type="button">Регионы</button>
+        <button class="tab" data-tab="cities" role="tab" aria-selected="false" type="button">Города</button>
+      </div>
       <div class="panel__search">
-        <input id="regionSearch" class="input" type="search" placeholder="Поиск региона…" autocomplete="off" aria-label="Поиск региона" />
+        <input id="regionSearch" class="input" type="search" placeholder="Поиск региона или города…" autocomplete="off" aria-label="Поиск региона или города" />
         <label class="toggle">
           <input type="checkbox" id="onlyActive" />
           <span>Только активные</span>
@@ -383,8 +399,59 @@ const REGIONS = [
   ["Челябинская область", 55.16, 61.40], ["Чувашия", 56.13, 47.25],
   ["Ярославская область", 57.63, 39.87],
 ].map(([name, lat, lon], i) => ({
-  id: "r" + i, name, lat, lon, status: "clear", since: Date.now(),
+  id: "r" + i, name, lat, lon, kind: "region", status: "clear", since: Date.now(),
 }));
+
+const CITIES = [
+  ["Москва", 55.75, 37.62, "Москва и Московская область"],
+  ["Санкт-Петербург", 59.94, 30.31, "Санкт-Петербург и Ленинградская область"],
+  ["Новосибирск", 55.03, 82.92, "Новосибирская область"],
+  ["Екатеринбург", 56.84, 60.61, "Свердловская область"],
+  ["Казань", 55.79, 49.11, "Татарстан"],
+  ["Нижний Новгород", 56.33, 44.00, "Нижегородская область"],
+  ["Челябинск", 55.16, 61.40, "Челябинская область"],
+  ["Самара", 53.20, 50.15, "Самарская область"],
+  ["Омск", 54.99, 73.37, "Омская область"],
+  ["Ростов-на-Дону", 47.23, 39.70, "Ростовская область"],
+  ["Уфа", 54.74, 55.97, "Башкортостан"],
+  ["Красноярск", 56.01, 92.87, "Красноярский край"],
+  ["Воронеж", 51.67, 39.18, "Воронежская область"],
+  ["Волгоград", 48.71, 44.51, "Волгоградская область"],
+  ["Краснодар", 45.03, 38.98, "Краснодарский край"],
+  ["Саратов", 51.53, 46.03, "Саратовская область"],
+  ["Тюмень", 57.15, 65.53, "Тюменская область"],
+  ["Тольятти", 53.51, 49.42, "Самарская область"],
+  ["Ижевск", 56.85, 53.20, "Удмуртия"],
+  ["Барнаул", 53.36, 83.75, "Алтайский край"],
+  ["Ульяновск", 54.32, 48.40, "Ульяновская область"],
+  ["Иркутск", 52.28, 104.28, "Иркутская область"],
+  ["Хабаровск", 48.48, 135.07, "Хабаровский край"],
+  ["Владивосток", 43.12, 131.89, "Приморский край"],
+  ["Ярославль", 57.63, 39.87, "Ярославская область"],
+  ["Махачкала", 42.98, 47.50, "Дагестан"],
+  ["Томск", 56.48, 84.95, "Томская область"],
+  ["Оренбург", 51.77, 55.10, "Оренбургская область"],
+  ["Кемерово", 55.35, 86.09, "Кемеровская область"],
+  ["Рязань", 54.63, 39.74, "Рязанская область"],
+  ["Астрахань", 46.35, 48.04, "Астраханская область"],
+  ["Пенза", 53.20, 45.00, "Пензенская область"],
+  ["Липецк", 52.61, 39.60, "Липецкая область"],
+  ["Тула", 54.19, 37.62, "Тульская область"],
+  ["Киров", 58.60, 49.66, "Кировская область"],
+  ["Чебоксары", 56.13, 47.25, "Чувашия"],
+  ["Калининград", 54.71, 20.51, "Калининградская область"],
+  ["Брянск", 53.25, 34.37, "Брянская область"],
+  ["Курск", 51.73, 36.19, "Курская область"],
+  ["Белгород", 50.60, 36.58, "Белгородская область"],
+  ["Ставрополь", 45.04, 41.97, "Ставропольский край"],
+  ["Севастополь", 44.62, 33.53, "Севастополь"],
+  ["Симферополь", 44.95, 34.10, "Крым"],
+  ["Сочи", 43.60, 39.73, "Краснодарский край"],
+].map(([name, lat, lon, region], i) => ({
+  id: "c" + i, name, lat, lon, region, kind: "city", status: "clear", since: Date.now(),
+}));
+
+const ALL = REGIONS.concat(CITIES);
 
 const TIPS = {
   clear: ["Угроз не фиксируется — оставайтесь на связи", "Проверяйте обновления периодически"],
@@ -395,8 +462,8 @@ const TIPS = {
 
 /* ===================== состояние ===================== */
 
-const state = { selected: null, soundOn: false, drawerRegion: null };
-const byId = new Map(REGIONS.map((r) => [r.id, r]));
+const state = { selected: null, soundOn: false, drawerRegion: null, tab: "regions" };
+const byId = new Map(ALL.map((r) => [r.id, r]));
 const els = {
   list: document.getElementById("regionList"),
   empty: document.getElementById("regionEmpty"),
@@ -431,13 +498,13 @@ function initDemoStatuses() {
     if (p < 0.52) return "attention";
     return "clear";
   };
-  REGIONS.forEach((r) => { r.status = pick(); r.since = Date.now() - Math.floor(rnd() * 3600e3); });
+  ALL.forEach((r) => { r.status = pick(); r.since = Date.now() - Math.floor(rnd() * 3600e3); });
 }
 
 // Раз в несколько секунд меняем статус случайного региона, как живой поток.
 function startDemoTicker() {
   setInterval(() => {
-    const r = REGIONS[Math.floor(Math.random() * REGIONS.length)];
+    const r = ALL[Math.floor(Math.random() * ALL.length)];
     const prev = r.status;
     const nextPool = prev === "clear" ? ["attention", "threat"]
       : prev === "attention" ? ["clear", "threat", "alert"]
@@ -461,16 +528,16 @@ function setStatus(region, status) {
   renderSummary();
 }
 
-function visibleRegions() {
+function visibleItems() {
   const q = els.search.value.trim().toLowerCase();
-  return REGIONS
+  return (state.tab === "cities" ? CITIES : REGIONS)
     .filter((r) => !q || r.name.toLowerCase().includes(q))
     .filter((r) => !els.onlyActive.checked || r.status !== "clear")
     .sort((a, b) => STATUSES[b.status].rank - STATUSES[a.status].rank || a.name.localeCompare(b.name, "ru"));
 }
 
 function renderList() {
-  const items = visibleRegions();
+  const items = visibleItems();
   els.empty.hidden = items.length > 0;
   els.list.replaceChildren(
     ...items.map((r) => {
@@ -496,12 +563,13 @@ function renderList() {
 
 function renderSummary() {
   const counts = { alert: 0, threat: 0, attention: 0, clear: 0 };
-  REGIONS.forEach((r) => counts[r.status]++);
+  ALL.forEach((r) => counts[r.status]++);
   document.getElementById("statAlert").textContent = counts.alert;
   document.getElementById("statThreat").textContent = counts.threat;
   document.getElementById("statAttention").textContent = counts.attention;
   document.getElementById("statClear").textContent = counts.clear;
   document.getElementById("statTotal").textContent = REGIONS.length;
+  document.getElementById("statCities").textContent = CITIES.length;
 }
 
 function pushFeed(region, prev, next) {
@@ -557,33 +625,39 @@ function initMap() {
     els.mapNote.textContent = "Карта недоступна без доступа к CDN — списки и лента работают в обычном режиме.";
     return;
   }
-  map = L.map(els.map, { zoomControl: true, attributionControl: true }).setView([54.5, 42], 5);
+  map = L.map(els.map, { zoomControl: true, attributionControl: true }).setView([55, 55], 4);
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 12,
     attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
   }).addTo(map);
-  REGIONS.forEach((r) => {
-    const m = L.circleMarker([r.lat, r.lon], {
-      radius: r.status === "alert" ? 12 : r.status === "threat" ? 10 : r.status === "attention" ? 8 : 6,
-      color: STATUSES[r.status].raw,
-      weight: 2,
-      fillColor: STATUSES[r.status].raw,
-      fillOpacity: r.status === "clear" ? 0.35 : 0.55,
-    }).addTo(map);
-    m.on("click", () => openDrawer(r));
-    markers.set(r.id, m);
-  });
+  REGIONS.forEach(addMarker);
+  CITIES.forEach(addMarker);
+}
+
+function markerStyle(r) {
+  const s = STATUSES[r.status];
+  if (r.kind === "city") {
+    return { radius: 5.5, color: "#0b1220", weight: 1.5, fillColor: s.raw, fillOpacity: 0.9 };
+  }
+  return {
+    radius: r.status === "alert" ? 13 : r.status === "threat" ? 11 : r.status === "attention" ? 9 : 7,
+    color: s.raw, weight: 2, fillColor: s.raw,
+    fillOpacity: r.status === "clear" ? 0.18 : 0.32,
+  };
+}
+
+function addMarker(r) {
+  if (!map) return;
+  const m = L.circleMarker([r.lat, r.lon], markerStyle(r)).addTo(map);
+  m.bindTooltip(r.name + (r.kind === "city" ? " (город)" : ""), { direction: "top" });
+  m.on("click", () => openDrawer(r));
+  markers.set(r.id, m);
 }
 
 function updateMarker(r) {
   const m = markers.get(r.id);
   if (!m) return;
-  m.setStyle({
-    radius: r.status === "alert" ? 12 : r.status === "threat" ? 10 : r.status === "attention" ? 8 : 6,
-    color: STATUSES[r.status].raw,
-    fillColor: STATUSES[r.status].raw,
-    fillOpacity: r.status === "clear" ? 0.35 : 0.55,
-  });
+  m.setStyle(markerStyle(r));
 }
 
 function flyTo(r) {
@@ -601,7 +675,8 @@ function openDrawer(r) {
   badge.style.color = s.color;
   badge.style.borderColor = s.raw;
   document.getElementById("drawerTitle").textContent = r.name;
-  document.getElementById("drawerSince").textContent = "Статус актуален: " + relTime(r.since);
+  document.getElementById("drawerSince").textContent =
+    (r.kind === "city" ? "Регион: " + r.region + " · " : "") + "статус актуален: " + relTime(r.since);
   document.getElementById("drawerTips").replaceChildren(
     ...TIPS[r.status].map((t) => {
       const li = document.createElement("li");
@@ -653,6 +728,17 @@ els.list.addEventListener("keydown", (e) => {
 els.search.addEventListener("input", renderList);
 els.onlyActive.addEventListener("change", renderList);
 
+document.querySelector(".tabs").addEventListener("click", (e) => {
+  const btn = e.target.closest(".tab");
+  if (!btn) return;
+  state.tab = btn.dataset.tab;
+  document.querySelectorAll(".tab").forEach((t) => {
+    t.classList.toggle("is-active", t === btn);
+    t.setAttribute("aria-selected", String(t === btn));
+  });
+  renderList();
+});
+
 document.getElementById("drawerClose").addEventListener("click", closeDrawer);
 els.drawerBackdrop.addEventListener("click", closeDrawer);
 document.addEventListener("keydown", (e) => {
@@ -682,8 +768,8 @@ document.getElementById("locateBtn").addEventListener("click", () => {
   if (!navigator.geolocation) { flyTo(REGIONS[24]); return; }
   navigator.geolocation.getCurrentPosition(
     (pos) => {
-      let best = REGIONS[0], bestD = Infinity;
-      for (const r of REGIONS) {
+      let best = CITIES[0], bestD = Infinity;
+      for (const r of CITIES) {
         const d = (r.lat - pos.coords.latitude) ** 2 + (r.lon - pos.coords.longitude) ** 2;
         if (d < bestD) { bestD = d; best = r; }
       }
