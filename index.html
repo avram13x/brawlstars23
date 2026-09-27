@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b1220" />
+  <meta name="description" content="АэроСкан — карта воздушной обстановки онлайн: статусы регионов, угрозы БПЛА, лента событий и карта укрытий. Демо-режим с симуляцией данных." />
+  <title>АэроСкан — карта воздушной обстановки онлайн</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%230b1220'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%2338bdf8' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='3' fill='%2338bdf8'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <a class="skip-link" href="#main">Перейти к содержимому</a>
+
+  <header class="topbar">
+    <div class="topbar__inner">
+      <a class="brand" href="./" aria-label="АэроСкан — на главную">
+        <svg class="brand__icon" viewBox="0 0 32 32" aria-hidden="true">
+          <circle cx="16" cy="16" r="14" fill="none" stroke="currentColor" stroke-width="2" opacity=".25"/>
+          <circle cx="16" cy="16" r="9" fill="none" stroke="currentColor" stroke-width="2" opacity=".5"/>
+          <circle cx="16" cy="16" r="3.2" fill="currentColor"/>
+          <path d="M16 16 27 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <span class="brand__text">АэроСкан<small>карта воздушной обстановки</small></span>
+      </a>
+
+      <div class="topbar__actions">
+        <span class="demo-pill" title="Данные симулируются и не являются официальными">
+          <span class="demo-pill__dot" aria-hidden="true"></span>демо-режим
+        </span>
+        <button id="soundToggle" class="btn btn--ghost" type="button" aria-pressed="false" title="Звуковые уведомления об изменении статусов">
+          <span class="btn__icon" aria-hidden="true">🔕</span><span class="btn__label">Звук выкл</span>
+        </button>
+        <button id="feedToggle" class="btn btn--ghost" type="button" aria-expanded="true" aria-controls="feedPanel">
+          <span class="btn__icon" aria-hidden="true">📡</span><span class="btn__label">Лента</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="summary" role="status" aria-live="polite">
+      <div class="summary__item summary__item--alert">
+        <span class="summary__num" id="statAlert">0</span><span class="summary__label">тревога</span>
+      </div>
+      <div class="summary__item summary__item--threat">
+        <span class="summary__num" id="statThreat">0</span><span class="summary__label">угроза</span>
+      </div>
+      <div class="summary__item summary__item--attention">
+        <span class="summary__num" id="statAttention">0</span><span class="summary__label">внимание</span>
+      </div>
+      <div class="summary__item summary__item--clear">
+        <span class="summary__num" id="statClear">0</span><span class="summary__label">без угроз</span>
+      </div>
+      <div class="summary__item summary__item--total">
+        <span class="summary__num" id="statTotal">0</span><span class="summary__label">регионов</span>
+      </div>
+      <div class="summary__clock" id="clock">--:--</div>
+    </div>
+  </header>
+
+  <main id="main" class="layout">
+    <aside class="panel panel--regions" aria-label="Регионы">
+      <div class="panel__search">
+        <input id="regionSearch" class="input" type="search" placeholder="Поиск региона…" autocomplete="off" aria-label="Поиск региона" />
+        <label class="toggle">
+          <input type="checkbox" id="onlyActive" />
+          <span>Только активные</span>
+        </label>
+      </div>
+      <ul id="regionList" class="region-list" role="list"></ul>
+      <p id="regionEmpty" class="region-empty" hidden>Ничего не найдено</p>
+    </aside>
+
+    <section class="map-wrap" aria-label="Карта">
+      <div id="map"></div>
+      <div class="map-note" id="mapNote" hidden></div>
+      <div class="legend" aria-label="Обозначения">
+        <span class="legend__item"><i class="dot dot--alert"></i>воздушная тревога</span>
+        <span class="legend__item"><i class="dot dot--threat"></i>угроза БПЛА</span>
+        <span class="legend__item"><i class="dot dot--attention"></i>внимание</span>
+        <span class="legend__item"><i class="dot dot--clear"></i>без угроз</span>
+      </div>
+      <button id="locateBtn" class="btn btn--map" type="button" title="Показать мой регион">
+        <span aria-hidden="true">📍</span> Мой регион
+      </button>
+    </section>
+
+    <aside class="panel panel--feed" id="feedPanel" aria-label="Лента событий">
+      <h2 class="panel__title">Лента событий</h2>
+      <ul id="feedList" class="feed" role="list"></ul>
+    </aside>
+  </main>
+
+  <div class="drawer-backdrop" id="drawerBackdrop" hidden></div>
+  <aside class="drawer" id="regionDrawer" role="dialog" aria-modal="true" aria-labelledby="drawerTitle" hidden>
+    <button class="drawer__close" id="drawerClose" type="button" aria-label="Закрыть">×</button>
+    <span class="drawer__status" id="drawerStatus">—</span>
+    <h2 class="drawer__title" id="drawerTitle">Регион</h2>
+    <p class="drawer__since" id="drawerSince"></p>
+    <h3 class="drawer__subtitle">Рекомендации</h3>
+    <ul class="drawer__tips" id="drawerTips"></ul>
+    <button class="btn btn--primary" id="drawerShow" type="button">Показать на карте</button>
+  </aside>
+
+  <footer class="footer">
+    <p>Сервис носит информационно-справочный характер и не заменяет официальные уведомления уполномоченных органов.
+    В демо-режиме все данные симулируются. Карта — © участники <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>.</p>
+  </footer>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
