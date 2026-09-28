@@ -846,6 +846,19 @@ a { color: var(--accent); }
   box-shadow: none;
 }
 
+.layer-switch {
+  position: absolute; top: 12px; right: 12px; z-index: 800;
+  display: flex; gap: 4px;
+  background: rgba(11, 18, 32, .88); backdrop-filter: blur(8px);
+  border: 1px solid var(--line); border-radius: 10px; padding: 4px;
+}
+.layer-btn {
+  border: 1px solid transparent; background: transparent; color: var(--muted);
+  border-radius: 7px; padding: 4px 10px; font: inherit; font-size: .74rem; cursor: pointer;
+}
+.layer-btn:hover { background: var(--card-2); }
+.layer-btn.is-active { background: var(--card-2); color: var(--text); border-color: var(--accent); }
+
 .legend {
   position: absolute; left: 12px; bottom: 12px; z-index: 800;
   display: flex; gap: 12px; flex-wrap: wrap;
@@ -865,6 +878,7 @@ a { color: var(--accent); }
   position: absolute; top: 12px; left: 12px; right: 12px; z-index: 900;
   background: rgba(11, 18, 32, .9); border: 1px solid var(--line);
   border-radius: 10px; padding: 10px 14px; font-size: .82rem; color: var(--muted);
+  pointer-events: none;
 }
 
 /* ---------- feed ---------- */
@@ -1004,6 +1018,11 @@ a { color: var(--accent); }
     <section class="map-wrap" aria-label="Карта">
       <div id="map"></div>
       <div class="map-note" id="mapNote" hidden></div>
+      <div class="layer-switch" role="group" aria-label="Подложка карты">
+        <button class="layer-btn is-active" data-layer="0" type="button">OSM</button>
+        <button class="layer-btn" data-layer="1" type="button">Тёмная</button>
+        <button class="layer-btn" data-layer="2" type="button">Схема</button>
+      </div>
       <div class="legend" aria-label="Обозначения">
         <span class="legend__item"><i class="dot dot--alert"></i>воздушная тревога</span>
         <span class="legend__item"><i class="dot dot--threat"></i>угроза БПЛА</span>
@@ -1432,25 +1451,61 @@ function initMap() {
     return;
   }
   map = L.map(els.map, { zoomControl: true, attributionControl: true }).setView([55, 55], 4);
-  const tiles = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 12,
-    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-  }).addTo(map);
-  // Если подложка не грузится (блокировка OSM) — показываем схему с маркерами и подписями.
-  let tileErrors = 0;
-  tiles.on("tileerror", () => {
-    tileErrors++;
-    if (tileErrors === 4) {
-      map.removeLayer(tiles);
-      document.getElementById("map").classList.add("map--schematic");
-      state.schematic = true;
-      refreshSchematicLabels();
-      els.mapNote.hidden = false;
-      els.mapNote.textContent = "Подложка OpenStreetMap недоступна из вашей сети — показана схема с маркерами и статусами.";
-    }
-  });
+  applyTileProvider(0);
   REGIONS.forEach(addMarker);
   CITIES.forEach(addMarker);
+}
+
+const TILE_PROVIDERS = [
+  {
+    name: "OSM",
+    url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    subdomains: "abc",
+  },
+  {
+    name: "Carto",
+    url: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/attributions">CARTO</a>',
+    subdomains: "abcd",
+  },
+];
+
+let tileLayer = null;
+let tileProviderIdx = 0;
+let tileErrors = 0;
+
+function markLayerBtn(idx) {
+  document.querySelectorAll(".layer-btn").forEach((b) => {
+    b.classList.toggle("is-active", Number(b.dataset.layer) === idx);
+  });
+}
+
+function applyTileProvider(idx) {
+  if (tileLayer) { map.removeLayer(tileLayer); tileLayer = null; }
+  if (idx >= TILE_PROVIDERS.length) { enterSchematic(); return; }
+  tileProviderIdx = idx;
+  tileErrors = 0;
+  const p = TILE_PROVIDERS[idx];
+  tileLayer = L.tileLayer(p.url, {
+    maxZoom: 12, attribution: p.attribution, subdomains: p.subdomains,
+  }).addTo(map);
+  // Тайлы не грузятся — пробуем следующий источник, затем схему.
+  tileLayer.on("tileerror", () => {
+    tileErrors++;
+    if (tileErrors >= 4) applyTileProvider(tileProviderIdx + 1);
+  });
+  markLayerBtn(idx);
+}
+
+function enterSchematic() {
+  if (tileLayer) { map.removeLayer(tileLayer); tileLayer = null; }
+  state.schematic = true;
+  document.getElementById("map").classList.add("map--schematic");
+  refreshSchematicLabels();
+  els.mapNote.hidden = false;
+  els.mapNote.textContent = "Подложка недоступна из вашей сети — показана схема с маркерами. Кнопка «Тёмная» может помочь.";
+  markLayerBtn(2);
 }
 
 const schematicLabels = [];
@@ -1570,6 +1625,22 @@ document.querySelector(".tabs").addEventListener("click", (e) => {
     t.setAttribute("aria-selected", String(t === btn));
   });
   renderList();
+});
+
+function setLayer(idx) {
+  if (idx === 2) { enterSchematic(); return; }
+  state.schematic = false;
+  document.getElementById("map").classList.remove("map--schematic");
+  schematicLabels.forEach((t) => map.removeLayer(t));
+  schematicLabels.length = 0;
+  els.mapNote.hidden = true;
+  applyTileProvider(idx);
+}
+
+document.querySelector(".layer-switch").addEventListener("click", (e) => {
+  const b = e.target.closest(".layer-btn");
+  if (!b) return;
+  setLayer(Number(b.dataset.layer));
 });
 
 document.getElementById("drawerClose").addEventListener("click", closeDrawer);
