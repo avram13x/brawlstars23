@@ -1019,9 +1019,10 @@ a { color: var(--accent); }
       <div id="map"></div>
       <div class="map-note" id="mapNote" hidden></div>
       <div class="layer-switch" role="group" aria-label="Подложка карты">
-        <button class="layer-btn is-active" data-layer="0" type="button">OSM</button>
-        <button class="layer-btn" data-layer="1" type="button">Тёмная</button>
-        <button class="layer-btn" data-layer="2" type="button">Схема</button>
+        <button class="layer-btn is-active" data-layer="0" type="button">Улицы</button>
+        <button class="layer-btn" data-layer="1" type="button">Рельеф</button>
+        <button class="layer-btn" data-layer="2" type="button">OSM</button>
+        <button class="layer-btn" data-layer="3" type="button">Схема</button>
       </div>
       <div class="legend" aria-label="Обозначения">
         <span class="legend__item"><i class="dot dot--alert"></i>воздушная тревога</span>
@@ -1057,7 +1058,7 @@ a { color: var(--accent); }
 
   <footer class="footer">
     <p>Сервис носит информационно-справочный характер и не заменяет официальные уведомления уполномоченных органов.
-    В демо-режиме все данные симулируются. Карта — © участники <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>.</p>
+    В демо-режиме все данные симулируются. Источник картографической подложки указан внизу карты.</p>
   </footer>
 
   <script>
@@ -1469,16 +1470,15 @@ function initMap() {
 
 const TILE_PROVIDERS = [
   {
-    name: "OSM",
-    url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    subdomains: "abc",
+    name: "Esri",
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
+    attribution: 'Tiles © <a href="https://www.esri.com/">Esri</a>',
   },
   {
-    name: "Carto",
-    url: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
-    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/attributions">CARTO</a>',
-    subdomains: "abcd",
+    name: "OpenTopoMap",
+    url: "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
+    attribution: 'Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, SRTM | Map style © <a href="https://opentopomap.org/">OpenTopoMap</a>',
+    subdomains: "abc",
   },
 ];
 
@@ -1498,9 +1498,9 @@ function applyTileProvider(idx) {
   tileProviderIdx = idx;
   tileErrors = 0;
   const p = TILE_PROVIDERS[idx];
-  tileLayer = L.tileLayer(p.url, {
-    maxZoom: 12, attribution: p.attribution, subdomains: p.subdomains,
-  }).addTo(map);
+  const options = { maxZoom: 12, attribution: p.attribution };
+  if (p.subdomains) options.subdomains = p.subdomains;
+  tileLayer = L.tileLayer(p.url, options).addTo(map);
   // Тайлы не грузятся — пробуем следующий источник, затем схему.
   tileLayer.on("tileerror", () => {
     tileErrors++;
@@ -1515,8 +1515,8 @@ function enterSchematic() {
   document.getElementById("map").classList.add("map--schematic");
   refreshSchematicLabels();
   els.mapNote.hidden = false;
-  els.mapNote.textContent = "Подложка недоступна из вашей сети — показана схема с маркерами. Кнопка «Тёмная» может помочь.";
-  markLayerBtn(2);
+  els.mapNote.textContent = "Подложки карты недоступны из вашей сети — показана схема с маркерами и статусами.";
+  markLayerBtn(3);
 }
 
 const schematicLabels = [];
@@ -1639,12 +1639,22 @@ document.querySelector(".tabs").addEventListener("click", (e) => {
 });
 
 function setLayer(idx) {
-  if (idx === 2) { enterSchematic(); return; }
+  if (idx === 3) { enterSchematic(); return; }
   state.schematic = false;
   document.getElementById("map").classList.remove("map--schematic");
   schematicLabels.forEach((t) => map.removeLayer(t));
   schematicLabels.length = 0;
   els.mapNote.hidden = true;
+  if (idx === 2) {
+    if (tileLayer) { map.removeLayer(tileLayer); tileLayer = null; }
+    tileLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 12,
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      subdomains: "abc",
+    }).addTo(map);
+    markLayerBtn(2);
+    return;
+  }
   applyTileProvider(idx);
 }
 
