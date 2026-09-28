@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#0b1220" />
-  <meta name="description" content="АэроСкан — карта воздушной обстановки онлайн: статусы регионов, угрозы БПЛА, лента событий и карта укрытий. Демо-режим с симуляцией данных." />
-  <title>АэроСкан — карта воздушной обстановки онлайн</title>
+  <meta name="description" content="Карта городов Краснодарского края с русскими подписями, региональной сводкой и ссылками на источник данных." />
+  <title>Кубань Радар — сводка по Краснодарскому краю</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%230b1220'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%2338bdf8' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='3' fill='%2338bdf8'/%3E%3C/svg%3E" />
   <style>
 /* Leaflet 1.9.4 (встроен) */
@@ -692,10 +692,11 @@ svg.leaflet-image-layer.leaflet-interactive path {
 
 * { box-sizing: border-box; }
 
-html, body { height: 100%; }
+html, body { min-height: 100%; }
 
 body {
   margin: 0;
+  min-height: 100vh;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   background:
     radial-gradient(1100px 500px at 85% -10%, rgba(56, 189, 248, .12), transparent 60%),
@@ -763,6 +764,9 @@ a { color: var(--accent); }
 .summary__item--total .summary__num { color: var(--accent); }
 .summary__label { color: var(--muted); }
 .summary__clock { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--muted); font-size: .85rem; }
+.summary__item--region { border-color: rgba(251, 146, 60, .45); }
+.summary__item--region.is-clear { border-color: rgba(52, 211, 153, .35); }
+.summary__item--region.is-unknown { border-color: var(--line); }
 
 /* ---------- buttons / inputs ---------- */
 .btn {
@@ -791,15 +795,17 @@ a { color: var(--accent); }
 
 /* ---------- layout ---------- */
 .layout {
-  flex: 1; display: grid; gap: 14px;
+  flex: none; display: grid; gap: 14px;
   grid-template-columns: 310px 1fr 300px;
+  grid-template-rows: minmax(600px, 1fr);
+  height: max(620px, calc(100vh - 164px));
   max-width: 1600px; width: 100%; margin: 0 auto; padding: 14px 18px 6px;
-  min-height: 0;
+  min-height: 620px;
 }
 
 .panel {
   background: var(--card); border: 1px solid var(--line);
-  border-radius: var(--radius); display: flex; flex-direction: column; overflow: hidden;
+  border-radius: var(--radius); display: flex; flex-direction: column; overflow: hidden; min-height: 0;
 }
 .panel__title { margin: 0; padding: 12px 14px 4px; font-size: .9rem; color: var(--muted); font-weight: 600; letter-spacing: .3px; text-transform: uppercase; }
 .panel__search { padding: 12px; display: flex; flex-direction: column; gap: 10px; border-bottom: 1px solid var(--line); }
@@ -826,6 +832,7 @@ a { color: var(--accent); }
 .region-item__dot--threat { background: var(--threat); box-shadow: 0 0 8px var(--threat); }
 .region-item__dot--attention { background: var(--attention); }
 .region-item__dot--clear { background: var(--clear); }
+.region-item__dot--city { background: var(--accent); box-shadow: 0 0 7px rgba(56, 189, 248, .55); }
 .region-item__name { flex: 1; font-size: .88rem; }
 .region-item__time { font-size: .72rem; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .region-empty { color: var(--muted); text-align: center; padding: 18px; font-size: .85rem; }
@@ -833,6 +840,49 @@ a { color: var(--accent); }
 /* ---------- map ---------- */
 .map-wrap { position: relative; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--line); min-height: 420px; }
 #map { position: absolute; inset: 0; background: var(--bg-soft); }
+.map-wrap--krai { min-height: 600px; }
+.radar-overlay { position: absolute; inset: 0; z-index: 620; overflow: hidden; pointer-events: none; }
+.radar-sweep {
+  position: absolute; width: min(90vmin, 900px); aspect-ratio: 1; left: 50%; top: 52%;
+  border-radius: 50%; transform: translate(-50%, -50%);
+  background: conic-gradient(from 0deg, transparent 0deg 295deg, rgba(52, 211, 153, 0) 315deg, rgba(52, 211, 153, .04) 335deg, rgba(52, 211, 153, .28) 359deg, transparent 360deg);
+  animation: radar-rotate 9s linear infinite; mix-blend-mode: screen;
+}
+.radar-sweep::before, .radar-sweep::after {
+  content: ""; position: absolute; inset: 12%; border: 1px solid rgba(52, 211, 153, .15); border-radius: 50%;
+  box-shadow: 0 0 0 70px rgba(52, 211, 153, .035), 0 0 0 140px rgba(52, 211, 153, .025);
+}
+.radar-sweep::after { inset: 34%; box-shadow: none; border-color: rgba(52, 211, 153, .12); }
+@keyframes radar-rotate { to { transform: translate(-50%, -50%) rotate(360deg); } }
+.drone-signal {
+  position: absolute; left: 14px; top: 14px; z-index: 850; display: flex; align-items: center; gap: 10px;
+  max-width: min(330px, calc(100% - 170px)); padding: 9px 13px; border-radius: 12px;
+  background: rgba(11, 18, 32, .92); border: 1px solid rgba(251, 146, 60, .6);
+  box-shadow: 0 0 22px rgba(251, 146, 60, .17); backdrop-filter: blur(8px);
+}
+.drone-signal[hidden] { display: none; }
+.drone-signal__icon { width: 30px; height: 30px; flex: none; color: var(--threat); animation: drone-pulse 1.8s ease-in-out infinite; }
+.drone-signal__copy { display: grid; gap: 3px; }
+.drone-signal__copy strong { color: #fed7aa; font-size: .78rem; }
+.drone-signal__copy small { color: var(--muted); font-size: .68rem; }
+@keyframes drone-pulse { 50% { opacity: .48; filter: drop-shadow(0 0 8px var(--threat)); } }
+.city-label {
+  background: rgba(11, 18, 32, .98); border: 1px solid rgba(143, 163, 200, .45); border-radius: 5px;
+  color: #f2f6ff; box-shadow: 0 2px 8px rgba(0, 0, 0, .38); font: 600 11px/1.3 system-ui, sans-serif;
+  padding: 2px 5px; white-space: nowrap;
+}
+.city-label::before { display: none; }
+.krai-source { padding: 12px; border-bottom: 1px solid var(--line); }
+.krai-source__status { display: flex; align-items: center; gap: 8px; font-size: .9rem; font-weight: 700; }
+.krai-source__dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+.krai-source__dot.is-alert { background: var(--threat); box-shadow: 0 0 10px var(--threat); animation: pulse 1.5s infinite; }
+.krai-source__dot.is-unknown { background: var(--attention); }
+.krai-source__detail, .krai-source__fine { color: var(--muted); font-size: .76rem; line-height: 1.5; margin: 8px 0 0; }
+.krai-source__links { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 9px; font-size: .76rem; }
+.krai-source__links a { color: var(--accent); text-decoration: none; }
+.krai-source__links a:hover { text-decoration: underline; }
+.feed-item__source { display: inline-block; margin-top: 5px; font-size: .7rem; color: var(--accent); text-decoration: none; }
+.feed-item__source:hover { text-decoration: underline; }
 
 .map--schematic {
   background:
@@ -935,15 +985,21 @@ a { color: var(--accent); }
 
 /* ---------- responsive ---------- */
 @media (max-width: 1200px) {
-  .layout { grid-template-columns: 280px 1fr; }
-  .panel--feed { grid-column: 1 / -1; max-height: 240px; }
+  .layout { grid-template-columns: 250px 1fr; grid-template-rows: minmax(600px, 1fr) 330px; height: 970px; }
+  .panel--feed { grid-column: 1 / -1; max-height: 330px; }
 }
 @media (max-width: 800px) {
-  .layout { grid-template-columns: 1fr; padding: 10px; }
-  .panel--regions { max-height: 300px; }
-  .map-wrap { min-height: 340px; }
+  .layout { grid-template-columns: 1fr; grid-template-rows: auto; height: auto; padding: 10px; min-height: 0; }
+  .panel--regions { max-height: 230px; }
+  .map-wrap, .map-wrap--krai { min-height: 55vh; }
   .btn__label { display: none; }
   .summary__clock { width: 100%; margin: 2px 0 0; text-align: right; }
+  .layer-switch { top: 66px; bottom: auto; right: 12px; }
+  .legend { gap: 8px; padding: 7px 9px; font-size: .68rem; }
+  .legend__item:last-child { display: none; }
+  .btn--map { padding: 6px 9px; font-size: .76rem; }
+  .drone-signal { top: 12px; left: 12px; max-width: calc(100% - 24px); }
+  .radar-sweep { width: 120vmin; }
 }
 </style>
 </head>
@@ -952,19 +1008,19 @@ a { color: var(--accent); }
 
   <header class="topbar">
     <div class="topbar__inner">
-      <a class="brand" href="./" aria-label="АэроСкан — на главную">
+      <a class="brand" href="./" aria-label="Кубань Радар — на главную">
         <svg class="brand__icon" viewBox="0 0 32 32" aria-hidden="true">
           <circle cx="16" cy="16" r="14" fill="none" stroke="currentColor" stroke-width="2" opacity=".25"/>
           <circle cx="16" cy="16" r="9" fill="none" stroke="currentColor" stroke-width="2" opacity=".5"/>
           <circle cx="16" cy="16" r="3.2" fill="currentColor"/>
           <path d="M16 16 27 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
         </svg>
-        <span class="brand__text">АэроСкан<small>карта воздушной обстановки</small></span>
+        <span class="brand__text">Кубань Радар<small>Краснодарский край · сводка и карта</small></span>
       </a>
 
       <div class="topbar__actions">
-        <span class="demo-pill" id="modePill" title="Данные симулируются и не являются официальными">
-          <span class="demo-pill__dot" aria-hidden="true"></span><span id="modePillText">демо-режим</span>
+        <span class="demo-pill" id="modePill" title="Сводка из открытого API; не является официальным оповещением">
+          <span class="demo-pill__dot" aria-hidden="true"></span><span id="modePillText">Подключение к источнику…</span>
         </span>
         <button id="soundToggle" class="btn btn--ghost" type="button" aria-pressed="false" title="Звуковые уведомления об изменении статусов">
           <span class="btn__icon" aria-hidden="true">🔕</span><span class="btn__label">Звук выкл</span>
@@ -976,47 +1032,47 @@ a { color: var(--accent); }
     </div>
 
     <div class="summary" role="status" aria-live="polite">
-      <div class="summary__item summary__item--alert">
-        <span class="summary__num" id="statAlert">0</span><span class="summary__label">тревога</span>
+      <div class="summary__item summary__item--region" id="summaryRegionStatus">
+        <span class="summary__num" id="statAlert">Загрузка</span><span class="summary__label">статус края</span>
       </div>
       <div class="summary__item summary__item--threat">
-        <span class="summary__num" id="statThreat">0</span><span class="summary__label">угроза</span>
+        <span class="summary__num" id="statThreat">—</span><span class="summary__label">сигнал БПЛА</span>
       </div>
       <div class="summary__item summary__item--attention">
-        <span class="summary__num" id="statAttention">0</span><span class="summary__label">внимание</span>
+        <span class="summary__num" id="statAttention">—</span><span class="summary__label">отметка ПВО</span>
+      </div>
+      <div class="summary__item summary__item--total">
+        <span class="summary__num" id="statTotal">19</span><span class="summary__label">городов на карте</span>
       </div>
       <div class="summary__item summary__item--clear">
-        <span class="summary__num" id="statClear">0</span><span class="summary__label">без угроз</span>
-      </div>
-      <div class="summary__item summary__item--total">
-        <span class="summary__num" id="statTotal">0</span><span class="summary__label">регионов</span>
-      </div>
-      <div class="summary__item summary__item--total">
-        <span class="summary__num" id="statCities">0</span><span class="summary__label">городов</span>
+        <span class="summary__num" id="statClear">—</span><span class="summary__label">данные источника · МСК</span>
       </div>
       <div class="summary__clock" id="clock">--:--</div>
     </div>
   </header>
 
   <main id="main" class="layout">
-    <aside class="panel panel--regions" aria-label="Регионы и города">
-      <div class="tabs" role="tablist" aria-label="Тип объектов">
-        <button class="tab is-active" data-tab="regions" role="tab" aria-selected="true" type="button">Регионы</button>
-        <button class="tab" data-tab="cities" role="tab" aria-selected="false" type="button">Города</button>
-      </div>
+    <aside class="panel panel--regions" aria-label="Города Краснодарского края">
+      <h2 class="panel__title">Города края</h2>
       <div class="panel__search">
-        <input id="regionSearch" class="input" type="search" placeholder="Поиск региона или города…" autocomplete="off" aria-label="Поиск региона или города" />
-        <label class="toggle">
-          <input type="checkbox" id="onlyActive" />
-          <span>Только активные</span>
-        </label>
+        <input id="regionSearch" class="input" type="search" placeholder="Найти город…" autocomplete="off" aria-label="Найти город Краснодарского края" />
       </div>
       <ul id="regionList" class="region-list" role="list"></ul>
       <p id="regionEmpty" class="region-empty" hidden>Ничего не найдено</p>
     </aside>
 
-    <section class="map-wrap" aria-label="Карта">
+    <section class="map-wrap map-wrap--krai" aria-label="Карта Краснодарского края">
       <div id="map"></div>
+      <div class="radar-overlay" aria-hidden="true"><div class="radar-sweep"></div></div>
+      <div class="drone-signal" id="droneSignal" hidden>
+        <svg class="drone-signal__icon" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+          <path d="M24 20v8m0-8-10-7m10 7 10-7M24 28l-10 7m10-7 10 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+          <path d="M18 20h12v8H18z" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/>
+          <circle cx="10" cy="11" r="5" stroke="currentColor" stroke-width="2.4"/><circle cx="38" cy="11" r="5" stroke="currentColor" stroke-width="2.4"/>
+          <circle cx="10" cy="37" r="5" stroke="currentColor" stroke-width="2.4"/><circle cx="38" cy="37" r="5" stroke="currentColor" stroke-width="2.4"/>
+        </svg>
+        <span class="drone-signal__copy"><strong id="droneSignalTitle">Сигнал БПЛА по краю</strong><small>региональная сводка · без координат</small></span>
+      </div>
       <div class="map-note" id="mapNote" hidden></div>
       <div class="layer-switch" role="group" aria-label="Подложка карты">
         <button class="layer-btn is-active" data-layer="0" type="button">Улицы</button>
@@ -1025,18 +1081,24 @@ a { color: var(--accent); }
         <button class="layer-btn" data-layer="3" type="button">Схема</button>
       </div>
       <div class="legend" aria-label="Обозначения">
-        <span class="legend__item"><i class="dot dot--alert"></i>воздушная тревога</span>
-        <span class="legend__item"><i class="dot dot--threat"></i>угроза БПЛА</span>
-        <span class="legend__item"><i class="dot dot--attention"></i>внимание</span>
-        <span class="legend__item"><i class="dot dot--clear"></i>без угроз</span>
+        <span class="legend__item"><i class="dot dot--clear"></i>город</span>
+        <span class="legend__item"><i class="dot dot--threat"></i>региональный сигнал</span>
+        <span class="legend__item">Сканирование — декоративная анимация, не трек БПЛА</span>
       </div>
-      <button id="locateBtn" class="btn btn--map" type="button" title="Показать мой регион">
-        <span aria-hidden="true">📍</span> Мой регион
+      <button id="locateBtn" class="btn btn--map" type="button" title="Показать центр Краснодарского края">
+        <span aria-hidden="true">📍</span> Центр края
       </button>
     </section>
 
     <aside class="panel panel--feed" id="feedPanel" aria-label="Лента событий">
-      <h2 class="panel__title">Лента событий</h2>
+      <h2 class="panel__title">Сводка Краснодарского края</h2>
+      <section class="krai-source" aria-live="polite">
+        <div class="krai-source__status"><span class="krai-source__dot" id="kraiStatusDot"></span><span id="kraiStatusText">Загружаю данные источника…</span></div>
+        <p class="krai-source__detail" id="kraiStatusDetail">Статус относится ко всему краю; карта не показывает положение или маршрут БПЛА.</p>
+        <p class="krai-source__fine" id="kraiSourceUpdated">Источник: Radar Russia API · проверка каждые 60 секунд.</p>
+        <div class="krai-source__links"><a id="kraiEventSource" href="https://t.me/radarrussiia" target="_blank" rel="noopener noreferrer">Канал-источник @radarrussiia ↗</a><a href="https://radar-russia.ru/api/state" target="_blank" rel="noopener noreferrer">Открытый API ↗</a></div>
+      </section>
+      <h2 class="panel__title">Последние сообщения по краю</h2>
       <ul id="feedList" class="feed" role="list"></ul>
     </aside>
   </main>
@@ -1057,8 +1119,7 @@ a { color: var(--accent); }
   </aside>
 
   <footer class="footer">
-    <p>Сервис носит информационно-справочный характер и не заменяет официальные уведомления уполномоченных органов.
-    В демо-режиме все данные симулируются. Источник картографической подложки указан внизу карты.</p>
+    <p>Информационная сводка по Краснодарскому краю, не официальное оповещение. Метки показывают только города, а не БПЛА. Круговой sweep — декоративная анимация, он не сканирует эфир; координаты, курс и траектории не отображаются. Данные: <a href="https://radar-russia.ru/api/state" target="_blank" rel="noopener noreferrer">Radar Russia API</a> и <a href="https://t.me/radarrussiia" target="_blank" rel="noopener noreferrer">публичный канал @radarrussiia</a>. Источник подложки указан на карте.</p>
   </footer>
 
   <script>
@@ -1106,7 +1167,11 @@ async function fetchRadarState() {
     clearTimeout(timer);
   }
   if (!res.ok) throw new Error("radar api " + res.status);
-  return res.json();
+  const data = await res.json();
+  if (!data || !Array.isArray(data.active) || !Array.isArray(data.history)) {
+    throw new Error("неожиданный формат данных radar api");
+  }
+  return data;
 }
 
 function eventFeedCls(h) {
@@ -1117,50 +1182,109 @@ function eventFeedCls(h) {
 }
 
 function applyRadarState(data) {
+  currentRadarData = data;
   const active = data.active || [];
-  const regionStatus = new Map();
-  active.forEach((a) => {
-    const st = apiKindToStatus(a.kind);
-    if (st && a.region) regionStatus.set(a.region, st);
-  });
+  krasnodarRecord = active.find((a) => a.region === "Краснодарский край") || null;
+  const regionStatus = apiKindToStatus(krasnodarRecord?.kind) || "clear";
   REGIONS.forEach((r) => {
-    r.status = regionStatus.get(r.name) || "clear";
-    r.since = Date.now();
+    r.status = regionStatus;
+    r.since = Date.parse(krasnodarRecord?.updatedAt || data.updatedAt) || Date.now();
     updateMarker(r);
   });
   CITIES.forEach((c) => {
-    let st = null;
-    for (const a of active) {
-      if ((a.districts || []).some((d) => d.toLowerCase() === c.name.toLowerCase())) {
-        st = apiKindToStatus(a.kind);
-        break;
-      }
-    }
-    const reg = byRegionName.get(c.region);
-    c.status = st || (reg ? reg.status : "clear");
-    c.since = Date.now();
+    c.status = regionStatus;
+    c.since = Date.parse(krasnodarRecord?.updatedAt || data.updatedAt) || Date.now();
     updateMarker(c);
   });
+  const kraiEvents = (data.history || [])
+    .filter((h) => (h.regions || []).includes("Краснодарский край") || h.region === "Краснодарский край")
+    .sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0));
+  lastKrasnodarEvent = krasnodarRecord?.lastEvent || kraiEvents[0] || null;
   feedItems.length = 0;
-  (data.history || []).slice(0, 40).forEach((h) => {
-    const loc = ((h.regions || []).concat(h.districts || [])).join(", ") || "Россия";
+  const seen = new Set();
+  kraiEvents.forEach((h) => {
+    const key = String(h.sourceMessageId || h.id || h.date) + ":" + h.kind + ":" + h.status;
+    if (seen.has(key) || feedItems.length >= 12) return;
+    seen.add(key);
+    const sourceChannel = String(h.channel || h.source || "radarrussiia").replace(/^@/, "");
+    const sourceMessageId = String(h.sourceMessageId || "");
+    const sourceUrl = /^[a-zA-Z0-9_]{4,40}$/.test(sourceChannel)
+      ? "https://t.me/" + sourceChannel + (/^\d+$/.test(sourceMessageId) ? "/" + sourceMessageId : "")
+      : "https://t.me/radarrussiia";
+    const kindName = h.kind === "uav" || h.kind === "flamingo" ? "БПЛА"
+      : h.kind === "pvo" ? "ПВО"
+      : h.kind === "missile" || h.kind === "aviation_missile" ? "Ракетная опасность"
+      : h.kind === "clear" ? "Отбой / изменение статуса" : "Сообщение по краю";
     feedItems.push({
-      title: loc,
-      sub: String(h.note || h.text || "").replace(/\s+/g, " ").trim(),
+      title: "Краснодарский край · " + kindName,
+      sub: String(h.note || h.text || "").replace(/\s+/g, " ").trim().slice(0, 180)
+        + " · " + formatMsk(h.date),
       cls: eventFeedCls(h),
       at: Date.parse(h.date) || Date.now(),
+      source: "@" + sourceChannel,
+      sourceUrl,
     });
   });
   renderList();
   renderSummary();
   renderFeed();
+  renderKraiSource();
   if (state.schematic) refreshSchematicLabels();
-  state.live = true;
+  state.live = sourceIsFresh(data);
   const pill = document.getElementById("modePill");
-  pill.classList.add("is-live");
-  pill.title = "Открытые данные radar-russia.ru (источник как у БПЛА24)";
-  document.getElementById("modePillText").textContent = "live · radar-russia.ru";
+  pill.classList.toggle("is-live", state.live);
+  pill.title = !state.live
+    ? "Сохранённый или устаревший срез radar-russia.ru; не актуальная live-сводка"
+    : "Открытые данные radar-russia.ru; см. ссылку на исходный канал";
+  document.getElementById("modePillText").textContent = state.live ? "live · radar-russia.ru" : "снимок · не live";
   hideNetBanner();
+}
+
+function formatMsk(value) {
+  const d = new Date(value || "");
+  if (!Number.isFinite(d.getTime())) return "время не указано";
+  return d.toLocaleString("ru-RU", {
+    timeZone: "Europe/Moscow", day: "2-digit", month: "2-digit",
+    hour: "2-digit", minute: "2-digit",
+  }) + " МСК";
+}
+
+function sourceIsFresh(data = currentRadarData) {
+  if (!data || data === EMBEDDED_STATE) return false;
+  const updatedAt = Date.parse(data.updatedAt || "");
+  return Number.isFinite(updatedAt) && Date.now() - updatedAt <= 3 * RADAR_POLL_MS;
+}
+
+function renderKraiSource() {
+  const hasUav = !!krasnodarRecord && ["uav", "flamingo"].includes(krasnodarRecord.kind);
+  const hasPvo = !!krasnodarRecord && (krasnodarRecord.alerts || []).some((a) => a.kind === "pvo" && a.status !== "clear");
+  const fresh = sourceIsFresh();
+  document.getElementById("droneSignal").hidden = !hasUav;
+  document.getElementById("droneSignalTitle").textContent = !fresh
+    ? "Сигнал БПЛА в сохранённом снимке" : "Сигнал БПЛА по краю";
+  const dot = document.getElementById("kraiStatusDot");
+  dot.classList.toggle("is-alert", (hasUav || hasPvo) && fresh);
+  dot.classList.toggle("is-unknown", !fresh);
+  document.getElementById("kraiStatusText").textContent = hasUav
+    ? fresh ? "Источник сообщает об угрозе БПЛА по краю" : "В последнем доступном снимке есть сигнал БПЛА по краю"
+    : hasPvo ? fresh ? "В источнике есть отметка ПВО по краю" : "В последнем доступном снимке есть отметка ПВО"
+    : !currentRadarData ? "Нет связи с источником — текущий статус неизвестен"
+    : fresh ? "Активных сигналов по краю сейчас нет" : "Данные источника устарели — текущий статус неизвестен";
+  document.getElementById("kraiStatusDetail").textContent = hasUav
+    ? "Сигнал относится ко всему краю" + (fresh ? "." : " в последнем сохранённом срезе.") + " Карта не показывает положение или маршрут БПЛА."
+    : "Сводка относится ко всему краю и не гарантирует отсутствие опасности. Следуйте официальным оповещениям.";
+  const updated = currentRadarData?.updatedAt || krasnodarRecord?.updatedAt;
+  document.getElementById("kraiSourceUpdated").textContent = updated
+    ? "Radar Russia API · " + (fresh ? "данные на " : "сохранённый снимок на ") + formatMsk(updated)
+      + (fresh ? " · опрос раз в минуту." : " · не в реальном времени.")
+    : "Radar Russia API · время обновления источником не указано.";
+  const sourceEvent = lastKrasnodarEvent;
+  const link = document.getElementById("kraiEventSource");
+  const channel = String(sourceEvent?.channel || sourceEvent?.source || "radarrussiia").replace(/^@/, "");
+  const messageId = String(sourceEvent?.sourceMessageId || "");
+  const safeChannel = /^[a-zA-Z0-9_]{4,40}$/.test(channel) ? channel : "radarrussiia";
+  link.href = "https://t.me/" + safeChannel + (/^\d+$/.test(messageId) ? "/" + messageId : "");
+  link.textContent = "Исходное сообщение @" + safeChannel + " ↗";
 }
 
 const STATUSES = {
@@ -1269,8 +1393,26 @@ const CITIES = [
   id: "c" + i, name, lat, lon, region, kind: "city", status: "clear", since: Date.now(),
 }));
 
-const ALL = REGIONS.concat(CITIES);
-
+REGIONS.splice(0, REGIONS.length, {
+  id: "kr", name: "Краснодарский край", lat: 45.04, lon: 39.0,
+  kind: "region", status: "clear", since: Date.now(),
+});
+const KRAI_CITIES = [
+  ["Краснодар", 45.0355, 38.9753], ["Сочи", 43.6028, 39.7342],
+  ["Новороссийск", 44.7239, 37.7689], ["Анапа", 44.8951, 37.3163],
+  ["Геленджик", 44.5613, 38.0769], ["Туапсе", 44.1006, 39.0739],
+  ["Армавир", 44.998, 41.1297], ["Ейск", 46.711, 38.276],
+  ["Славянск-на-Кубани", 45.2604, 38.126], ["Крымск", 44.9348, 38.006],
+  ["Тихорецк", 45.8547, 40.125], ["Кропоткин", 45.4375, 40.575],
+  ["Белореченск", 44.771, 39.878], ["Лабинск", 44.6342, 40.7356],
+  ["Тимашёвск", 45.616, 38.945], ["Темрюк", 45.2722, 37.385],
+  ["Горячий Ключ", 44.63, 39.13], ["Курганинск", 44.887, 40.591],
+  ["Апшеронск", 44.464, 39.735],
+];
+CITIES.splice(0, CITIES.length, ...KRAI_CITIES.map(([name, lat, lon], i) => ({
+  id: "kr-city-" + i, name, lat, lon, region: "Краснодарский край",
+  kind: "city", status: "clear", since: Date.now(),
+})));
 const TIPS = {
   clear: ["Угроз не фиксируется — оставайтесь на связи", "Проверяйте обновления периодически"],
   attention: ["Будьте готовы к сигналу тревоги", "Держите при себе документы и заряженный телефон", "Уточните расположение ближайшего укрытия"],
@@ -1289,23 +1431,25 @@ function hideNetBanner() {
 
 function markSnapshotMode() {
   const pill = document.getElementById("modePill");
-  pill.classList.add("is-live");
+  pill.classList.remove("is-live");
   document.getElementById("modePillText").textContent =
     SNAPSHOT_STAMP ? "снимок " + SNAPSHOT_STAMP : "снимок";
-  pill.title = "Встроенный снимок данных radar-russia.ru на момент скачивания файла";
+  pill.title = "Сохранённый снимок radar-russia.ru на момент сборки файла; не является актуальной live-сводкой";
 }
 
 /* ===================== состояние ===================== */
 
-const state = { selected: null, soundOn: false, drawerRegion: null, tab: "regions", live: false };
-const byId = new Map(ALL.map((r) => [r.id, r]));
+const state = { selected: null, soundOn: false, drawerRegion: null, live: false, schematic: false };
+const byId = new Map([...REGIONS, ...CITIES].map((r) => [r.id, r]));
 const byRegionName = new Map(REGIONS.map((r) => [r.name, r]));
 const findRegion = (name) => byRegionName.get(name) || REGIONS[0];
+let currentRadarData = null;
+let krasnodarRecord = null;
+let lastKrasnodarEvent = null;
 const els = {
   list: document.getElementById("regionList"),
   empty: document.getElementById("regionEmpty"),
   search: document.getElementById("regionSearch"),
-  onlyActive: document.getElementById("onlyActive"),
   feed: document.getElementById("feedList"),
   feedPanel: document.getElementById("feedPanel"),
   map: document.getElementById("map"),
@@ -1321,55 +1465,12 @@ const feedItems = [];
 
 /* ===================== демо-симуляция ===================== */
 
-const seedRandom = (seed) => () => {
-  seed = (seed * 9301 + 49297) % 233280;
-  return seed / 233280;
-};
-
-function initDemoStatuses() {
-  const rnd = seedRandom(Date.now() % 100000);
-  const pick = () => {
-    const p = rnd();
-    if (p < 0.14) return "alert";
-    if (p < 0.34) return "threat";
-    if (p < 0.52) return "attention";
-    return "clear";
-  };
-  ALL.forEach((r) => { r.status = pick(); r.since = Date.now() - Math.floor(rnd() * 3600e3); });
-}
-
-// Раз в несколько секунд меняем статус случайного региона, как живой поток.
-function startDemoTicker() {
-  setInterval(() => {
-    const r = ALL[Math.floor(Math.random() * ALL.length)];
-    const prev = r.status;
-    const nextPool = prev === "clear" ? ["attention", "threat"]
-      : prev === "attention" ? ["clear", "threat", "alert"]
-      : prev === "threat" ? ["attention", "alert", "clear"]
-      : ["threat", "clear"];
-    const next = nextPool[Math.floor(Math.random() * nextPool.length)];
-    if (next === prev) return;
-    setStatus(r, next);
-    addFeedItem({ title: r.name, sub: STATUSES[prev].label + " → " + STATUSES[next].label, cls: next, at: Date.now() });
-    if (state.soundOn && STATUSES[next].rank > STATUSES[prev].rank) beep();
-  }, 6000);
-}
-
 /* ===================== рендер ===================== */
-
-function setStatus(region, status) {
-  region.status = status;
-  region.since = Date.now();
-  updateMarker(region);
-  renderList();
-  renderSummary();
-}
 
 function visibleItems() {
   const q = els.search.value.trim().toLowerCase();
-  return (state.tab === "cities" ? CITIES : REGIONS)
+  return CITIES
     .filter((r) => !q || r.name.toLowerCase().includes(q))
-    .filter((r) => !els.onlyActive.checked || r.status !== "clear")
     .sort((a, b) => STATUSES[b.status].rank - STATUSES[a.status].rank || a.name.localeCompare(b.name, "ru"));
 }
 
@@ -1384,14 +1485,13 @@ function renderList() {
       li.setAttribute("role", "button");
       li.dataset.id = r.id;
       const dot = document.createElement("span");
-      dot.className = `region-item__dot region-item__dot--${r.status}`;
+      dot.className = `region-item__dot region-item__dot--${r.kind === "city" ? "city" : r.status}`;
       const name = document.createElement("span");
       name.className = "region-item__name";
       name.textContent = r.name;
       const time = document.createElement("span");
       time.className = "region-item__time";
-      time.dataset.since = r.since;
-      time.textContent = relTime(r.since);
+      time.textContent = "статус края";
       li.append(dot, name, time);
       return li;
     })
@@ -1399,14 +1499,19 @@ function renderList() {
 }
 
 function renderSummary() {
-  const counts = { alert: 0, threat: 0, attention: 0, clear: 0 };
-  ALL.forEach((r) => counts[r.status]++);
-  document.getElementById("statAlert").textContent = counts.alert;
-  document.getElementById("statThreat").textContent = counts.threat;
-  document.getElementById("statAttention").textContent = counts.attention;
-  document.getElementById("statClear").textContent = counts.clear;
-  document.getElementById("statTotal").textContent = REGIONS.length;
-  document.getElementById("statCities").textContent = CITIES.length;
+  const hasUav = !!krasnodarRecord && ["uav", "flamingo"].includes(krasnodarRecord.kind);
+  const hasPvo = !!krasnodarRecord && (krasnodarRecord.alerts || []).some((a) => a.kind === "pvo" && a.status !== "clear");
+  const fresh = sourceIsFresh();
+  const statusEl = document.getElementById("statAlert");
+  statusEl.textContent = !currentRadarData ? "Нет данных"
+    : !fresh ? hasUav ? "Сигнал · снимок" : hasPvo ? "ПВО · снимок" : "Снимок устарел"
+    : hasUav ? "СИГНАЛ" : hasPvo ? "ПВО" : "Нет сигнала";
+  document.getElementById("summaryRegionStatus").classList.toggle("is-clear", fresh && !hasUav && !hasPvo);
+  document.getElementById("summaryRegionStatus").classList.toggle("is-unknown", !fresh);
+  document.getElementById("statThreat").textContent = hasUav ? fresh ? "Есть" : "снимок" : fresh ? "Нет" : "—";
+  document.getElementById("statAttention").textContent = hasPvo ? fresh ? "Есть" : "снимок" : fresh ? "Нет" : "—";
+  document.getElementById("statTotal").textContent = CITIES.length;
+  document.getElementById("statClear").textContent = currentRadarData?.updatedAt ? formatMsk(currentRadarData.updatedAt) : "нет связи";
 }
 
 function addFeedItem(item) {
@@ -1433,6 +1538,15 @@ function renderFeed() {
       text.className = "feed-item__text";
       text.textContent = f.sub || "";
       li.append(head, text);
+      if (f.sourceUrl) {
+        const source = document.createElement("a");
+        source.className = "feed-item__source";
+        source.href = f.sourceUrl;
+        source.target = "_blank";
+        source.rel = "noopener noreferrer";
+        source.textContent = (f.source || "Источник") + " ↗";
+        li.append(source);
+      }
       return li;
     })
   );
@@ -1462,10 +1576,11 @@ function initMap() {
     els.mapNote.textContent = "Карта недоступна без доступа к CDN — списки и лента работают в обычном режиме.";
     return;
   }
-  map = L.map(els.map, { zoomControl: true, attributionControl: true }).setView([55, 55], 4);
+  map = L.map(els.map, { zoomControl: true, attributionControl: true, minZoom: 5, maxZoom: 12 });
+  map.fitBounds(L.latLngBounds(CITIES.map((c) => [c.lat, c.lon])).pad(0.12), { maxZoom: 7.5 });
   applyTileProvider(0);
-  REGIONS.forEach(addMarker);
   CITIES.forEach(addMarker);
+  map.on("zoomend", refreshCityLabels);
 }
 
 const TILE_PROVIDERS = [
@@ -1534,10 +1649,10 @@ function refreshSchematicLabels() {
 }
 
 function markerStyle(r) {
-  const s = STATUSES[r.status];
   if (r.kind === "city") {
-    return { radius: 5.5, color: "#0b1220", weight: 1.5, fillColor: s.raw, fillOpacity: 0.9 };
+    return { radius: 4.5, color: "#07111f", weight: 1.5, fillColor: "#38bdf8", fillOpacity: 0.96 };
   }
+  const s = STATUSES[r.status];
   return {
     radius: r.status === "alert" ? 13 : r.status === "threat" ? 11 : r.status === "attention" ? 9 : 7,
     color: s.raw, weight: 2, fillColor: s.raw,
@@ -1548,9 +1663,41 @@ function markerStyle(r) {
 function addMarker(r) {
   if (!map) return;
   const m = L.circleMarker([r.lat, r.lon], markerStyle(r)).addTo(map);
-  m.bindTooltip(r.name + (r.kind === "city" ? " (город)" : ""), { direction: "top" });
+  if (r.kind === "city") {
+    m.bindTooltip(r.name, cityTooltipOptions(r));
+  } else {
+    m.bindTooltip(r.name, { direction: "top" });
+  }
   m.on("click", () => openDrawer(r));
   markers.set(r.id, m);
+}
+
+const MAIN_CITY_LABELS = new Set([
+  "Краснодар", "Сочи", "Новороссийск", "Анапа", "Геленджик", "Туапсе", "Армавир", "Ейск",
+]);
+const CITY_LABEL_DIRECTIONS = {
+  "Анапа": "top", "Новороссийск": "top", "Геленджик": "right", "Туапсе": "left",
+  "Темрюк": "left", "Славянск-на-Кубани": "top", "Крымск": "top",
+  "Краснодар": "right", "Горячий Ключ": "right", "Армавир": "right",
+  "Ейск": "right", "Сочи": "left",
+};
+
+function cityTooltipOptions(city) {
+  return {
+    direction: CITY_LABEL_DIRECTIONS[city.name] || "top",
+    permanent: MAIN_CITY_LABELS.has(city.name) || map.getZoom() >= 8.5,
+    className: "city-label",
+    offset: [0, -5],
+  };
+}
+
+function refreshCityLabels() {
+  CITIES.forEach((city) => {
+    const marker = markers.get(city.id);
+    if (!marker) return;
+    marker.unbindTooltip();
+    marker.bindTooltip(city.name, cityTooltipOptions(city));
+  });
 }
 
 function updateMarker(r) {
@@ -1560,7 +1707,7 @@ function updateMarker(r) {
 }
 
 function flyTo(r) {
-  if (map) map.flyTo([r.lat, r.lon], 8, { duration: 0.8 });
+  if (map) map.flyTo([r.lat, r.lon], r.kind === "city" ? 9 : 7, { duration: 0.8 });
 }
 
 /* ===================== панель региона ===================== */
@@ -1569,15 +1716,19 @@ function openDrawer(r) {
   state.drawerRegion = r;
   state.selected = r.id;
   const s = STATUSES[r.status];
+  const fresh = sourceIsFresh();
   const badge = els.drawer.querySelector(".drawer__status");
-  badge.textContent = s.label;
-  badge.style.color = s.color;
-  badge.style.borderColor = s.raw;
+  badge.textContent = !fresh ? "свежий статус неизвестен" : r.kind === "city" ? "сводка края · " + s.label : s.label;
+  badge.style.color = fresh ? s.color : "var(--muted)";
+  badge.style.borderColor = fresh ? s.raw : "var(--line)";
   document.getElementById("drawerTitle").textContent = r.name;
-  document.getElementById("drawerSince").textContent =
-    (r.kind === "city" ? "Регион: " + r.region + " · " : "") + "статус актуален: " + relTime(r.since);
+  document.getElementById("drawerSince").textContent = !fresh
+    ? "Последнее сохранённое обновление: " + formatMsk(currentRadarData?.updatedAt) + ". Следуйте официальным оповещениям."
+    : r.kind === "city"
+    ? "Городская метка · сводка обобщена по Краснодарскому краю, это не статус города. Обновлено " + relTime(r.since) + "."
+    : "Статус источника · обновлено " + relTime(r.since) + ".";
   document.getElementById("drawerTips").replaceChildren(
-    ...TIPS[r.status].map((t) => {
+    ...(fresh ? TIPS[r.status] : ["Текущий статус источника неизвестен", "Проверяйте официальные уведомления"]).map((t) => {
       const li = document.createElement("li");
       li.textContent = t;
       return li;
@@ -1625,19 +1776,6 @@ els.list.addEventListener("keydown", (e) => {
   if (li) { e.preventDefault(); openDrawer(byId.get(li.dataset.id)); }
 });
 els.search.addEventListener("input", renderList);
-els.onlyActive.addEventListener("change", renderList);
-
-document.querySelector(".tabs").addEventListener("click", (e) => {
-  const btn = e.target.closest(".tab");
-  if (!btn) return;
-  state.tab = btn.dataset.tab;
-  document.querySelectorAll(".tab").forEach((t) => {
-    t.classList.toggle("is-active", t === btn);
-    t.setAttribute("aria-selected", String(t === btn));
-  });
-  renderList();
-});
-
 function setLayer(idx) {
   if (idx === 3) { enterSchematic(); return; }
   state.schematic = false;
@@ -1690,20 +1828,7 @@ feedBtn.addEventListener("click", () => {
 });
 
 document.getElementById("locateBtn").addEventListener("click", () => {
-  if (!navigator.geolocation) { flyTo(findRegion("Москва")); return; }
-  navigator.geolocation.getCurrentPosition(
-    (pos) => {
-      let best = CITIES[0], bestD = Infinity;
-      for (const r of CITIES) {
-        const d = (r.lat - pos.coords.latitude) ** 2 + (r.lon - pos.coords.longitude) ** 2;
-        if (d < bestD) { bestD = d; best = r; }
-      }
-      openDrawer(best);
-      flyTo(best);
-    },
-    () => flyTo(findRegion("Москва")),
-    { timeout: 8000 }
-  );
+  flyTo(findRegion("Краснодарский край"));
 });
 
 /* ===================== часы и старт ===================== */
@@ -1722,9 +1847,13 @@ async function boot() {
   setInterval(tickClock, 20000);
   setInterval(refreshTimes, 30000);
 
-  // Живые данные из Radar Russia API; при недоступности — демо-режим.
+  // Live data uses the source timestamp; the bundled copy is shown as a snapshot only.
   const retry = () => {
-    fetchRadarState().then(applyRadarState).catch((e) => showNetBanner("Всё ещё недоступно: " + String(e.message || e)));
+    fetchRadarState().then(applyRadarState).catch((e) => {
+      renderKraiSource();
+      renderSummary();
+      showNetBanner("Источник недоступен: " + String(e.message || e) + " — текущий статус неизвестен.");
+    });
   };
   document.getElementById("netRetry").addEventListener("click", retry);
   try {
@@ -1736,18 +1865,19 @@ async function boot() {
       showNetBanner("Живые данные недоступны: " + String(err.message || err) +
         " — показан встроенный снимок. При появлении сети данные обновятся сами.");
     } else {
-      initDemoStatuses();
       renderList();
       renderSummary();
       renderFeed();
-      startDemoTicker();
-      showNetBanner("Живые данные недоступны: " + String(err.message || err) + " — включён демо-режим.");
+      renderKraiSource();
+      showNetBanner("Нет доступа к Radar Russia API: " + String(err.message || err) + " — актуальный статус неизвестен.");
     }
   }
   setInterval(async () => {
     try {
       applyRadarState(await fetchRadarState());
     } catch (_) {
+      renderKraiSource();
+      renderSummary();
       showNetBanner("Нет связи с radar-russia.ru — показаны последние полученные данные.");
     }
   }, RADAR_POLL_MS);
