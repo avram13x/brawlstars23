@@ -834,6 +834,18 @@ a { color: var(--accent); }
 .map-wrap { position: relative; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--line); min-height: 420px; }
 #map { position: absolute; inset: 0; background: var(--bg-soft); }
 
+.map--schematic {
+  background:
+    repeating-linear-gradient(0deg, transparent 0 39px, rgba(56, 189, 248, .07) 39px 40px),
+    repeating-linear-gradient(90deg, transparent 0 39px, rgba(56, 189, 248, .07) 39px 40px),
+    var(--bg-soft);
+}
+.schematic-label {
+  background: transparent; border: none; color: var(--text);
+  font-size: .68rem; font-weight: 600; text-shadow: 0 1px 3px rgba(0, 0, 0, .9);
+  box-shadow: none;
+}
+
 .legend {
   position: absolute; left: 12px; bottom: 12px; z-index: 800;
   display: flex; gap: 12px; flex-wrap: wrap;
@@ -1119,6 +1131,7 @@ function applyRadarState(data) {
   renderList();
   renderSummary();
   renderFeed();
+  if (state.schematic) refreshSchematicLabels();
   state.live = true;
   const pill = document.getElementById("modePill");
   pill.classList.add("is-live");
@@ -1419,12 +1432,39 @@ function initMap() {
     return;
   }
   map = L.map(els.map, { zoomControl: true, attributionControl: true }).setView([55, 55], 4);
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  const tiles = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 12,
     attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
   }).addTo(map);
+  // Если подложка не грузится (блокировка OSM) — показываем схему с маркерами и подписями.
+  let tileErrors = 0;
+  tiles.on("tileerror", () => {
+    tileErrors++;
+    if (tileErrors === 4) {
+      map.removeLayer(tiles);
+      document.getElementById("map").classList.add("map--schematic");
+      state.schematic = true;
+      refreshSchematicLabels();
+      els.mapNote.hidden = false;
+      els.mapNote.textContent = "Подложка OpenStreetMap недоступна из вашей сети — показана схема с маркерами и статусами.";
+    }
+  });
   REGIONS.forEach(addMarker);
   CITIES.forEach(addMarker);
+}
+
+const schematicLabels = [];
+function refreshSchematicLabels() {
+  schematicLabels.forEach((t) => map.removeLayer(t));
+  schematicLabels.length = 0;
+  REGIONS.forEach((r) => {
+    if (r.status === "clear") return;
+    const t = L.tooltip({ permanent: true, direction: "top", className: "schematic-label" })
+      .setLatLng([r.lat, r.lon])
+      .setContent(r.name)
+      .addTo(map);
+    schematicLabels.push(t);
+  });
 }
 
 function markerStyle(r) {
