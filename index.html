@@ -82,6 +82,7 @@ a { color: var(--accent); }
   background: var(--attention);
   animation: pulse 2s infinite;
 }
+.demo-pill.is-live .demo-pill__dot { background: var(--clear); }
 @keyframes pulse { 50% { opacity: .35; } }
 
 .summary {
@@ -265,8 +266,8 @@ a { color: var(--accent); }
       </a>
 
       <div class="topbar__actions">
-        <span class="demo-pill" title="Данные симулируются и не являются официальными">
-          <span class="demo-pill__dot" aria-hidden="true"></span>демо-режим
+        <span class="demo-pill" id="modePill" title="Данные симулируются и не являются официальными">
+          <span class="demo-pill__dot" aria-hidden="true"></span><span id="modePillText">демо-режим</span>
         </span>
         <button id="soundToggle" class="btn btn--ghost" type="button" aria-pressed="false" title="Звуковые уведомления об изменении статусов">
           <span class="btn__icon" aria-hidden="true">🔕</span><span class="btn__label">Звук выкл</span>
@@ -359,11 +360,76 @@ a { color: var(--accent); }
 
 /* ===================== данные и конфигурация ===================== */
 
-// В реальном режиме данные приходят из API; интерфейс адаптера ниже.
-const createDataSource = () => ({
-  // fetchStatuses() -> Promise<[{id, status}]>. Замените на реальный запрос.
-  async fetchStatuses() { return null; },
-});
+/* ===================== источник данных =====================
+   Открытый Public Read-Only API Radar Russia — тот же источник,
+   который использует БПЛА24 (github.com/ehristoforu/bpla24). */
+const RADAR_API_URL = "https://radar-russia.ru/api/state";
+const RADAR_POLL_MS = 60000;
+
+function apiKindToStatus(kind) {
+  if (kind === "missile" || kind === "aviation_missile" || kind === "artillery") return "alert";
+  if (kind === "pvo" || kind === "pvo_prepare") return "attention";
+  if (kind === "uav" || kind === "flamingo") return "threat";
+  return null;
+}
+
+async function fetchRadarState() {
+  const res = await fetch(RADAR_API_URL, { cache: "no-store" });
+  if (!res.ok) throw new Error("radar api " + res.status);
+  return res.json();
+}
+
+function eventFeedCls(h) {
+  if (h.status === "clear" || h.kind === "clear") return "clear";
+  if (h.kind === "missile" || h.kind === "aviation_missile") return "alert";
+  if (h.kind === "pvo") return "attention";
+  return "threat";
+}
+
+function applyRadarState(data) {
+  const active = data.active || [];
+  const regionStatus = new Map();
+  active.forEach((a) => {
+    const st = apiKindToStatus(a.kind);
+    if (st && a.region) regionStatus.set(a.region, st);
+  });
+  REGIONS.forEach((r) => {
+    r.status = regionStatus.get(r.name) || "clear";
+    r.since = Date.now();
+    updateMarker(r);
+  });
+  CITIES.forEach((c) => {
+    let st = null;
+    for (const a of active) {
+      if ((a.districts || []).some((d) => d.toLowerCase() === c.name.toLowerCase())) {
+        st = apiKindToStatus(a.kind);
+        break;
+      }
+    }
+    const reg = byRegionName.get(c.region);
+    c.status = st || (reg ? reg.status : "clear");
+    c.since = Date.now();
+    updateMarker(c);
+  });
+  feedItems.length = 0;
+  (data.history || []).slice(0, 40).forEach((h) => {
+    const loc = ((h.regions || []).concat(h.districts || [])).join(", ") || "Россия";
+    feedItems.push({
+      title: loc,
+      sub: String(h.note || h.text || "").replace(/\s+/g, " ").trim(),
+      cls: eventFeedCls(h),
+      at: Date.parse(h.date) || Date.now(),
+    });
+  });
+  renderList();
+  renderSummary();
+  renderFeed();
+  state.live = true;
+  const pill = document.getElementById("modePill");
+  pill.classList.add("is-live");
+  pill.title = "Открытые данные radar-russia.ru (источник как у БПЛА24)";
+  document.getElementById("modePillText").textContent = "live · radar-russia.ru";
+}
 
 const STATUSES = {
   clear:     { label: "без угроз",       color: "var(--clear)",     raw: "#34d399", rank: 0 },
@@ -373,47 +439,67 @@ const STATUSES = {
 };
 
 const REGIONS = [
-  ["Адыгея", 44.91, 40.10], ["Архангельская область", 64.54, 40.54],
-  ["Астраханская область", 46.35, 48.04], ["Башкортостан", 54.74, 55.97],
+  ["Алтайский край", 53.35, 83.75], ["Амурская область", 50.29, 127.53],
+  ["Архангельская область", 64.54, 40.54], ["Астраханская область", 46.35, 48.04],
   ["Белгородская область", 50.60, 36.58], ["Брянская область", 53.25, 34.37],
   ["Владимирская область", 56.13, 40.41], ["Волгоградская область", 48.71, 44.51],
   ["Вологодская область", 59.22, 39.89], ["Воронежская область", 51.67, 39.18],
-  ["Донецкая Народная Республика", 48.00, 37.80], ["Запорожская область", 46.85, 35.37],
-  ["Ивановская область", 57.00, 40.97], ["Калининградская область", 54.71, 20.51],
-  ["Калужская область", 54.51, 36.26], ["Кировская область", 58.60, 49.66],
-  ["Костромская область", 57.77, 40.93], ["Краснодарский край", 45.03, 38.98],
-  ["Крым", 44.95, 34.10], ["Курская область", 51.73, 36.19],
-  ["Липецкая область", 52.61, 39.60], ["Луганская Народная Республика", 48.57, 39.30],
-  ["Марий Эл", 56.63, 47.89], ["Мордовия", 54.18, 45.18],
-  ["Москва и Московская область", 55.75, 37.62], ["Нижегородская область", 56.33, 44.00],
+  ["Донецкая Народная Республика", 48.00, 37.80], ["Еврейская автономная область", 48.67, 132.16],
+  ["Забайкальский край", 52.03, 113.50], ["Запорожская область", 46.85, 35.37],
+  ["Ивановская область", 57.00, 40.97], ["Иркутская область", 52.28, 104.28],
+  ["Кабардино-Балкарская Республика", 43.49, 43.61], ["Калининградская область", 54.71, 20.51],
+  ["Калужская область", 54.51, 36.26], ["Камчатский край", 53.02, 158.65],
+  ["Карачаево-Черкесская Республика", 44.22, 42.06], ["Кемеровская область", 55.35, 86.09],
+  ["Кировская область", 58.60, 49.66], ["Костромская область", 57.77, 40.93],
+  ["Краснодарский край", 45.03, 38.98], ["Красноярский край", 56.01, 92.87],
+  ["Курганская область", 55.44, 65.34], ["Курская область", 51.73, 36.19],
+  ["Ленинградская область", 59.60, 31.30], ["Липецкая область", 52.61, 39.60],
+  ["Луганская Народная Республика", 48.57, 39.30], ["Магаданская область", 59.56, 150.80],
+  ["Москва", 55.75, 37.62], ["Московская область", 55.80, 37.90],
+  ["Мурманская область", 68.97, 33.09], ["Ненецкий автономный округ", 67.64, 53.64],
+  ["Нижегородская область", 56.33, 44.00], ["Новгородская область", 58.52, 31.27],
+  ["Новосибирская область", 55.03, 82.92], ["Омская область", 54.99, 73.37],
   ["Оренбургская область", 51.77, 55.10], ["Орловская область", 52.97, 36.06],
   ["Пензенская область", 53.20, 45.00], ["Пермский край", 58.01, 56.25],
-  ["Псковская область", 57.82, 28.33], ["Ростовская область", 47.23, 39.70],
+  ["Приморский край", 43.12, 131.89], ["Псковская область", 57.82, 28.33],
+  ["Республика Адыгея", 44.91, 40.10], ["Республика Алтай", 51.96, 85.96],
+  ["Республика Башкортостан", 54.74, 55.97], ["Республика Бурятия", 51.83, 107.58],
+  ["Республика Дагестан", 42.98, 47.50], ["Республика Ингушетия", 43.17, 44.81],
+  ["Республика Калмыкия", 46.31, 44.26], ["Республика Карелия", 61.78, 34.36],
+  ["Республика Коми", 61.67, 50.84], ["Республика Крым", 44.95, 34.10],
+  ["Республика Марий Эл", 56.63, 47.89], ["Республика Мордовия", 54.18, 45.18],
+  ["Республика Саха (Якутия)", 62.03, 129.73], ["Республика Северная Осетия — Алания", 43.02, 44.68],
+  ["Республика Татарстан", 55.79, 49.11], ["Республика Тыва", 51.72, 94.44],
+  ["Республика Хакасия", 53.72, 91.44], ["Ростовская область", 47.23, 39.70],
   ["Рязанская область", 54.63, 39.74], ["Самарская область", 53.20, 50.15],
-  ["Санкт-Петербург и Ленинградская область", 59.94, 30.31], ["Саратовская область", 51.53, 46.03],
+  ["Санкт-Петербург", 59.94, 30.31], ["Саратовская область", 51.53, 46.03],
+  ["Сахалинская область", 46.96, 142.73], ["Свердловская область", 56.84, 60.61],
   ["Севастополь", 44.62, 33.53], ["Смоленская область", 54.78, 32.05],
   ["Ставропольский край", 45.04, 41.97], ["Тамбовская область", 52.72, 41.44],
-  ["Татарстан", 55.79, 49.11], ["Тверская область", 56.86, 35.91],
-  ["Тульская область", 54.19, 37.62], ["Удмуртия", 56.85, 53.20],
-  ["Ульяновская область", 54.32, 48.40], ["Херсонская область", 46.64, 32.60],
-  ["Челябинская область", 55.16, 61.40], ["Чувашия", 56.13, 47.25],
+  ["Тверская область", 56.86, 35.91], ["Томская область", 56.48, 84.95],
+  ["Тульская область", 54.19, 37.62], ["Тюменская область", 57.15, 65.53],
+  ["Удмуртская Республика", 56.85, 53.20], ["Ульяновская область", 54.32, 48.40],
+  ["Хабаровский край", 48.48, 135.07], ["Ханты-Мансийский автономный округ — Югра", 61.00, 73.43],
+  ["Херсонская область", 46.64, 32.60], ["Челябинская область", 55.16, 61.40],
+  ["Чеченская Республика", 43.31, 45.69], ["Чувашская Республика", 56.13, 47.25],
+  ["Чукотский автономный округ", 64.73, 177.51], ["Ямало-Ненецкий автономный округ", 66.53, 66.61],
   ["Ярославская область", 57.63, 39.87],
 ].map(([name, lat, lon], i) => ({
   id: "r" + i, name, lat, lon, kind: "region", status: "clear", since: Date.now(),
 }));
 
 const CITIES = [
-  ["Москва", 55.75, 37.62, "Москва и Московская область"],
-  ["Санкт-Петербург", 59.94, 30.31, "Санкт-Петербург и Ленинградская область"],
+  ["Москва", 55.75, 37.62, "Москва"],
+  ["Санкт-Петербург", 59.94, 30.31, "Санкт-Петербург"],
   ["Новосибирск", 55.03, 82.92, "Новосибирская область"],
   ["Екатеринбург", 56.84, 60.61, "Свердловская область"],
-  ["Казань", 55.79, 49.11, "Татарстан"],
+  ["Казань", 55.79, 49.11, "Республика Татарстан"],
   ["Нижний Новгород", 56.33, 44.00, "Нижегородская область"],
   ["Челябинск", 55.16, 61.40, "Челябинская область"],
   ["Самара", 53.20, 50.15, "Самарская область"],
   ["Омск", 54.99, 73.37, "Омская область"],
   ["Ростов-на-Дону", 47.23, 39.70, "Ростовская область"],
-  ["Уфа", 54.74, 55.97, "Башкортостан"],
+  ["Уфа", 54.74, 55.97, "Республика Башкортостан"],
   ["Красноярск", 56.01, 92.87, "Красноярский край"],
   ["Воронеж", 51.67, 39.18, "Воронежская область"],
   ["Волгоград", 48.71, 44.51, "Волгоградская область"],
@@ -421,14 +507,14 @@ const CITIES = [
   ["Саратов", 51.53, 46.03, "Саратовская область"],
   ["Тюмень", 57.15, 65.53, "Тюменская область"],
   ["Тольятти", 53.51, 49.42, "Самарская область"],
-  ["Ижевск", 56.85, 53.20, "Удмуртия"],
+  ["Ижевск", 56.85, 53.20, "Удмуртская Республика"],
   ["Барнаул", 53.36, 83.75, "Алтайский край"],
   ["Ульяновск", 54.32, 48.40, "Ульяновская область"],
   ["Иркутск", 52.28, 104.28, "Иркутская область"],
   ["Хабаровск", 48.48, 135.07, "Хабаровский край"],
   ["Владивосток", 43.12, 131.89, "Приморский край"],
   ["Ярославль", 57.63, 39.87, "Ярославская область"],
-  ["Махачкала", 42.98, 47.50, "Дагестан"],
+  ["Махачкала", 42.98, 47.50, "Республика Дагестан"],
   ["Томск", 56.48, 84.95, "Томская область"],
   ["Оренбург", 51.77, 55.10, "Оренбургская область"],
   ["Кемерово", 55.35, 86.09, "Кемеровская область"],
@@ -438,14 +524,14 @@ const CITIES = [
   ["Липецк", 52.61, 39.60, "Липецкая область"],
   ["Тула", 54.19, 37.62, "Тульская область"],
   ["Киров", 58.60, 49.66, "Кировская область"],
-  ["Чебоксары", 56.13, 47.25, "Чувашия"],
+  ["Чебоксары", 56.13, 47.25, "Чувашская Республика"],
   ["Калининград", 54.71, 20.51, "Калининградская область"],
   ["Брянск", 53.25, 34.37, "Брянская область"],
   ["Курск", 51.73, 36.19, "Курская область"],
   ["Белгород", 50.60, 36.58, "Белгородская область"],
   ["Ставрополь", 45.04, 41.97, "Ставропольский край"],
   ["Севастополь", 44.62, 33.53, "Севастополь"],
-  ["Симферополь", 44.95, 34.10, "Крым"],
+  ["Симферополь", 44.95, 34.10, "Республика Крым"],
   ["Сочи", 43.60, 39.73, "Краснодарский край"],
 ].map(([name, lat, lon, region], i) => ({
   id: "c" + i, name, lat, lon, region, kind: "city", status: "clear", since: Date.now(),
@@ -462,8 +548,10 @@ const TIPS = {
 
 /* ===================== состояние ===================== */
 
-const state = { selected: null, soundOn: false, drawerRegion: null, tab: "regions" };
+const state = { selected: null, soundOn: false, drawerRegion: null, tab: "regions", live: false };
 const byId = new Map(ALL.map((r) => [r.id, r]));
+const byRegionName = new Map(REGIONS.map((r) => [r.name, r]));
+const findRegion = (name) => byRegionName.get(name) || REGIONS[0];
 const els = {
   list: document.getElementById("regionList"),
   empty: document.getElementById("regionEmpty"),
@@ -513,7 +601,7 @@ function startDemoTicker() {
     const next = nextPool[Math.floor(Math.random() * nextPool.length)];
     if (next === prev) return;
     setStatus(r, next);
-    pushFeed(r, prev, next);
+    addFeedItem({ title: r.name, sub: STATUSES[prev].label + " → " + STATUSES[next].label, cls: next, at: Date.now() });
     if (state.soundOn && STATUSES[next].rank > STATUSES[prev].rank) beep();
   }, 6000);
 }
@@ -572,8 +660,8 @@ function renderSummary() {
   document.getElementById("statCities").textContent = CITIES.length;
 }
 
-function pushFeed(region, prev, next) {
-  feedItems.unshift({ region: region.name, prev, next, at: Date.now() });
+function addFeedItem(item) {
+  feedItems.unshift(item);
   if (feedItems.length > 40) feedItems.pop();
   renderFeed();
 }
@@ -582,11 +670,11 @@ function renderFeed() {
   els.feed.replaceChildren(
     ...feedItems.map((f) => {
       const li = document.createElement("li");
-      li.className = "feed-item feed-item--" + f.next;
+      li.className = "feed-item feed-item--" + f.cls;
       const head = document.createElement("div");
       head.className = "feed-item__head";
       const name = document.createElement("span");
-      name.textContent = f.region;
+      name.textContent = f.title;
       const time = document.createElement("span");
       time.className = "feed-item__time";
       time.dataset.since = f.at;
@@ -594,7 +682,7 @@ function renderFeed() {
       head.append(name, time);
       const text = document.createElement("p");
       text.className = "feed-item__text";
-      text.textContent = `${STATUSES[f.prev].label} → ${STATUSES[f.next].label}`;
+      text.textContent = f.sub || "";
       li.append(head, text);
       return li;
     })
@@ -765,7 +853,7 @@ feedBtn.addEventListener("click", () => {
 });
 
 document.getElementById("locateBtn").addEventListener("click", () => {
-  if (!navigator.geolocation) { flyTo(REGIONS[24]); return; }
+  if (!navigator.geolocation) { flyTo(findRegion("Москва")); return; }
   navigator.geolocation.getCurrentPosition(
     (pos) => {
       let best = CITIES[0], bestD = Infinity;
@@ -776,7 +864,7 @@ document.getElementById("locateBtn").addEventListener("click", () => {
       openDrawer(best);
       flyTo(best);
     },
-    () => flyTo(REGIONS[24]),
+    () => flyTo(findRegion("Москва")),
     { timeout: 8000 }
   );
 });
@@ -789,7 +877,6 @@ function tickClock() {
 }
 
 async function boot() {
-  initDemoStatuses();
   initMap();
   renderList();
   renderSummary();
@@ -798,16 +885,22 @@ async function boot() {
   setInterval(tickClock, 20000);
   setInterval(refreshTimes, 30000);
 
-  // Пробуем реальный источник; если его нет — остаёмся в демо-режиме.
+  // Живые данные из Radar Russia API; при недоступности — демо-режим.
   try {
-    const updates = await createDataSource().fetchStatuses();
-    if (Array.isArray(updates)) {
-      updates.forEach(({ id, status }) => { if (byId.has(id) && STATUSES[status]) setStatus(byId.get(id), status); });
-      document.querySelector(".demo-pill").hidden = true;
-    } else {
-      startDemoTicker();
-    }
+    applyRadarState(await fetchRadarState());
+    setInterval(async () => {
+      try {
+        applyRadarState(await fetchRadarState());
+        els.mapNote.hidden = true;
+      } catch (_) {
+        els.mapNote.hidden = false;
+        els.mapNote.textContent = "Нет связи с radar-russia.ru — показаны последние полученные данные.";
+      }
+    }, RADAR_POLL_MS);
   } catch (_) {
+    initDemoStatuses();
+    renderList();
+    renderSummary();
     startDemoTicker();
   }
 }
